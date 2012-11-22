@@ -19,8 +19,8 @@ library(classInt)
 
 ## Change the folder name if needed
 ## This folder must include three subfolders
-## with names SIAR, CMSAF_2010_2011_SISdm, and figs
-setwd('~/Dropbox/CMSAF_SIAR/')
+## with names SIAR, data, and figs
+setwd('~/Investigacion/DocsPropios/CMSAF_SIAR/')
 
 ################################################################################
 ## HORIZONTAL PLANE
@@ -32,17 +32,21 @@ setwd('~/Dropbox/CMSAF_SIAR/')
 
 SIAR <- read.csv('http://solar.r-forge.r-project.org/data/SIAR.csv')
 
-spainMeteo <- apply(SIAR[, c(7, 3, 1)], 1,
-                    function(x){
-                      try(readSIAR(prov=x[2], est=x[3],
-                               start='01/01/2010', end='31/12/2011',
-                               lat=x[1]))
-                    }
-                    )
-idxMeteo <- sapply(spainMeteo, function(x)class(x)=='Meteo')
+## SIAR webpage has changed and the function readSIAR does not
+## work with it. The result of this code is contained in the
+## spainMeteo20102011.RData file
 
-spainMeteoOK<-spainMeteo[idxMeteo]
-save(spainMeteo, idxMeteo, spainMeteoOK, 'spainMeteo20102011.RData')
+## spainMeteo <- apply(SIAR[, c(7, 3, 1)], 1,
+##                     function(x){
+##                       try(readSIAR(prov=x[2], est=x[3],
+##                                start='01/01/2010', end='31/12/2011',
+##                                lat=x[1]))
+##                     }
+##                     )
+## idxMeteo <- sapply(spainMeteo, function(x)class(x)=='Meteo')
+
+## spainMeteoOK<-spainMeteo[idxMeteo]
+## save(spainMeteo, idxMeteo, spainMeteoOK, 'spainMeteo20102011.RData')
 
 ##########
 ## CMSAF
@@ -66,15 +70,15 @@ projection(stackSIS) <- projSIAR
 
 setwd(old)
 
-writeRaster(stackSIS, filename='CMSAF_2010_2011_SISdm/SISd2011', overwrite=TRUE)
+writeRaster(stackSIS, filename='data/SISd2011', overwrite=TRUE)
 
 G0yCMSAF2010 <- calc(SISd2010, fun=function(x)sum(x, na.rm=1)/1000,
-                     filename='CMSAF_2010_2011_SISdm/G0yCMSAF2010')
+                     filename='data/G0yCMSAF2010')
 G0yCMSAF2011 <- calc(SISd2011, fun=function(x)sum(x, na.rm=1)/1000,
-                     filename='CMSAF_2010_2011_SISdm/G0yCMSAF2011')
+                     filename='data/G0yCMSAF2011')
 G0yCMSAF <- (G0yCMSAF2010 + G0yCMSAF2011)/2
 
-writeRaster(G0yCMSAF, filename='CMSAF_2010_2011_SISdm/G0yCMSAF')
+writeRaster(G0yCMSAF, filename='data/G0yCMSAF')
 
 ################################################################################
 ## EFFECTIVE IRRADIATION
@@ -84,7 +88,7 @@ writeRaster(G0yCMSAF, filename='CMSAF_2010_2011_SISdm/G0yCMSAF')
 #########
 ## SIAR
 #########
-load('SIAR/spainMeteo20102011.RData')
+load('data/spainMeteo20102011.RData')
 
 #### Cleaning...
 
@@ -126,7 +130,7 @@ gefList <- function(x){
 ncores <- detectCores()
 gefSIAR <- mclapply(spainMeteoOK, FUN = gefList, mc.cores=ncores)
 
-save(gefSIAR, file='SIAR/gefSIAR.RData')
+save(gefSIAR, file='data/gefSIAR.RData')
 
 #########
 ## CMSAF
@@ -194,8 +198,8 @@ gefParallel <- function(data, filename="", nodes=detectCores(), blocks=8,...){
 
 ncores <- detectCores()
 
-SISd2010 <- brick('CMSAF_2010_2011_SISdm/SISd2010.grd')
-SISd2011 <- brick('CMSAF_2010_2011_SISdm/SISd2011.grd')
+SISd2010 <- brick('data/SISd2010.grd')
+SISd2011 <- brick('data/SISd2011.grd')
 
 idx2010 <- fBTd('serie', year=2010)
 SISd2010 <- setZ(SISd2010, idx2010)
@@ -205,14 +209,14 @@ idx2011 <- fBTd('serie', year=2011)
 SISd2011 <- setZ(SISd2011, idx2011)
 layerNames(SISd2011) <- as.character(idx2011)
 
-gef2010 <- gefParallel(SISd2010, filename='CMSAF_2010_2011_SISdm/gef2010')
+gef2010 <- gefParallel(SISd2010, filename='data/gef2010')
 
-gef2011 <- gefParallel(SISd2011, filename='CMSAF_2010_2011_SISdm/gef2011')
+gef2011 <- gefParallel(SISd2011, filename='data/gef2011')
 
 gefCMSAF <- (gef2010 + gef2011)/2
 layerNames(gefCMSAF)=c('Fixed', 'Two', 'Horiz')
 
-writeRaster(gefCMSAF, filename='CMSAF_2010_2011_SISdm/gefCMSAF')
+writeRaster(gefCMSAF, filename='data/gefCMSAF')
 
 
 ################################################################################
@@ -228,9 +232,10 @@ writeRaster(gefCMSAF, filename='CMSAF_2010_2011_SISdm/gefCMSAF')
 ## SIAR
 ##########
 
-load('SIAR/spainMeteo20102011.RData')
+load('data/spainMeteo20102011.RData')
 
 SIAR <- read.csv('http://solar.r-forge.r-project.org/data/SIAR.csv')
+SIAR <- SIAR[idxMeteo,]
 
 nDays <- function(x)as.numeric(diff(range(indexD(x))))
 ndays <- sapply(spainMeteoOK, nDays)
@@ -242,7 +247,6 @@ spainG0y <- sapply(spainMeteoOK, meanYearlySums)/1000
 clean <- (ndays>=600) & (spainG0y>=1000)
 
 spainMeteoOK <- spainMeteoOK[clean]
-SIAR <- SIAR[idxMeteo,]
 SIAR <- SIAR[clean,]
 
 g0SIAR <- lapply(spainMeteoOK, getG0)
@@ -274,21 +278,21 @@ spSIAR <- SpatialPointsDataFrame(SIAR[, c(6, 7)], SIAR[, -c(6, 7)],
 ## CMSAF
 ##########
 
-SISd2010 <- brick('CMSAF_2010_2011_SISdm/SISd2010.grd')
+SISd2010 <- brick('data/SISd2010.grd')
 
 idx2010 <- fBTd('serie', year=2010)
 SISd2010 <- setZ(SISd2010, idx2010)
-layerNames(SISd2010) <- as.character(idx2010)
+names(SISd2010) <- as.character(idx2010)
 
-SISd2011 <- brick('CMSAF_2010_2011_SISdm/SISd2011.grd')
+SISd2011 <- brick('data/SISd2011.grd')
 
 idx2011 <- fBTd('serie', year=2011)
 SISd2011 <- setZ(SISd2011, idx2011)
-layerNames(SISd2011) <- as.character(idx2011)
+names(SISd2011) <- as.character(idx2011)
 
-G0yCMSAF <- raster('CMSAF_2010_2011_SISdm/G0yCMSAF.grd')
-G0yCMSAF2010 <- raster('CMSAF_2010_2011_SISdm/G0yCMSAF2010.grd')
-G0yCMSAF2011 <- raster('CMSAF_2010_2011_SISdm/G0yCMSAF2011.grd')
+G0yCMSAF <- raster('data/G0yCMSAF.grd')
+G0yCMSAF2010 <- raster('data/G0yCMSAF2010.grd')
+G0yCMSAF2011 <- raster('data/G0yCMSAF2011.grd')
 
 spSIAR$G0yCMSAF <- extract(G0yCMSAF, spSIAR)
 
@@ -296,7 +300,7 @@ spSIAR$difG0y <-spSIAR$G0yCMSAF-spSIAR$G0ySIAR
 spSIAR$outTolerance <- abs(spSIAR$difG0y/spSIAR$G0ySIAR)>0.05
 
 ##############################
-## Comparison SIAR-CMSAF
+## Comparison SIAR-CMSAF (daily values)
 ##############################
 
 g0CMSAF2010 <- extract(SISd2010, spSIAR)
@@ -336,9 +340,11 @@ krigeRaster <- function(formula, data, raster, ...){
   grd <- as(stack(lonLayer, latLayer, raster), 'SpatialGridDataFrame')
   names(grd) <- c('lon', 'lat', deparse(substitute(raster)))
 
+  proj4string(data) <- proj4string(grd) ## seems to be a bug in proj4string<- with SpatialGrid
   resSP <- krige(formula, data, grd, ...)
   res <- as(resSP, 'RasterStack')
-  layerNames(res) <- c('pred', 'var')
+  names(res) <- c('pred', 'var')
+  projection(res) <- projection(raster)
   res
 }
 
@@ -358,7 +364,7 @@ G0yKrig <- krigeRaster(G0ySIAR~G0yCMSAF, spSIAR, G0yCMSAF, model=fitvgmCMSAF)
 ## SIAR
 ##########
 
-load('SIAR/gefSIAR.RData')
+load('data/gefSIAR.RData')
 
 gefSIARMean <- do.call(rbind, lapply(gefSIAR, colMeans, na.rm=1))
 colnames(gefSIARMean) <- c('FixedSIAR', 'TwoSIAR', 'HorizSIAR')
@@ -370,9 +376,9 @@ spGef <- spCbind(spSIAR, as.data.frame(gefSIARMean))
 ## CMSAF
 ##########
 
-gefCMSAF2010 <- brick('CMSAF_2010_2011_SISdm/gef2010')
-gefCMSAF2011 <- brick('CMSAF_2010_2011_SISdm/gef2011')
-gefCMSAF <- brick('CMSAF_2010_2011_SISdm/gefCMSAF')
+gefCMSAF2010 <- brick('data/gef2010')
+gefCMSAF2011 <- brick('data/gef2011')
+gefCMSAF <- brick('data/gefCMSAF')
 
 gefExtract <- as.data.frame(extract(gefCMSAF, spGef))
 names(gefExtract) <- paste(layerNames(gefCMSAF), 'CMSAF', sep='')
@@ -436,14 +442,41 @@ spGef$difHorizKrig <- spGef$HorizKrig - spGef$HorizSIAR
 save(spSIAR, g0SIAR, g0CMSAF, g0Dif,
      G0yKrig,
      spGef, FixedKrig, HorizKrig, TwoKrig,
-     file='krig.RData')
+     file='data/krig.RData')
 
 
+## Display variograms together
+vgmCMSAF$id <- 'G0'
+vgmFixed$id <- 'Fixed'
+vgmHoriz$id <- 'Horiz.'
+vgmTwo$id <- 'Two'
 
+v <- list(G0=vgmCMSAF, Fixed=vgmFixed, Horiz=vgmHoriz, Two=vgmTwo)
+m <- list(G0=fitvgmCMSAF, Fixed=fitvgmFixed, Horiz=fitvgmHoriz, Two=fitvgmTwo)
+
+modelLine <- function(v, m){
+  l <- variogramLine(m, max(v$dist), n=nrow(v))
+  names(l) <- c('dist.model', 'gamma.model')
+  l
+  }
+
+vList <- mapply(modelLine, v, m, SIMPLIFY=FALSE)
+
+vm <- cbind(do.call(rbind, v), do.call(rbind, vList))
+
+pV <- xyplot(gamma ~ dist, data=vm, groups=id,
+             xlab='Distance (km)', ylab='Semivariance') +
+  glayer(panel.text(x[1], y[1], group.value, pos=3))
+pM <- xyplot(gamma.model ~ dist.model, data=vm, groups=id, type='l')
+
+trellis.device(pdf, file='figs/variograms.pdf')
+pV + pM
+dev.off()
 
 ################################################################################
 ## GRAPHICS
 ################################################################################
+## setwd where the github repository is located
 
 ##############################
 ## Bubbles
@@ -500,27 +533,27 @@ bubbles <- function(obj, n=7, style='fisher',
 
 
 #########################
-##Datos diarios de CMSAF
+## CMSAF daily data
 #########################
-SISd2010 <- brick('CMSAF_2010_2011_SISdm/SISd2010.grd')
+SISd2010 <- brick('data/SISd2010.grd')
 
 idx2010 <- fBTd('serie', year=2010)
 SISd2010 <- setZ(SISd2010, idx2010)
-layerNames(SISd2010) <- as.character(idx2010)
+names(SISd2010) <- as.character(idx2010)
 
-SISd2011 <- brick('CMSAF_2010_2011_SISdm/SISd2011.grd')
+SISd2011 <- brick('data/SISd2011.grd')
 
 idx2011 <- fBTd('serie', year=2011)
 SISd2011 <- setZ(SISd2011, idx2011)
-layerNames(SISd2011) <- as.character(idx2011)
+names(SISd2011) <- as.character(idx2011)
 
 
 ##############################
 ## hovmoller
 ##############################
-SISd <- stack(c('CMSAF_2010_2011_SISdm/SISd2010.grd',
-                'CMSAF_2010_2011_SISdm/SISd2011.grd'))
-layerNames(SISd) <- c(layerNames(SISd2010), layerNames(SISd2011))
+SISd <- stack(c('data/SISd2010.grd',
+                'data/SISd2011.grd'))
+names(SISd) <- c(names(SISd2010), names(SISd2011))
 SISd <- setZ(SISd, c(idx2010, idx2011))
 
 pHov <- hovmoller(SISd, par.settings=BTCTheme, add.contour=FALSE)
@@ -528,12 +561,11 @@ trellis.device(pdf, file='figs/hovmoller.pdf')
 pHov
 dev.off()
 
-##############################
-load('krig.RData')
+##################################################################
+## Auxiliary data
+##################################################################
 
-datGef <- as.data.frame(spGef)
-
-## administrative boundaries
+## Spanish administrative boundaries
 old <- setwd(tempdir())
 download.file('http://www.gadm.org/data/shp/ESP_adm.zip', 'ESP_adm.zip')
 unzip('ESP_adm.zip')
@@ -541,15 +573,27 @@ projSIAR <- CRS(projection(spSIAR))
 mapaSHP <- readShapeLines('ESP_adm2.shp', proj4string=projSIAR)
 setwd(old)
 
-## altitude mask
+## Spanish altitude mask
 old <- setwd(tempdir())
 download.file('http://www.diva-gis.org/data/msk_alt/ESP_msk_alt.zip', 'ESP_msk_alt.zip')
 unzip('ESP_msk_alt.zip')
 elevMask <- raster('ESP_msk_alt')
 setwd(old)
 
-G0yCMSAF <- raster('CMSAF_2010_2011_SISdm/G0yCMSAF.grd')
-gefCMSAF <- brick('CMSAF_2010_2011_SISdm/gefCMSAF')
+
+## France, Andorra, Portugal and Morocco boundaries (from Natural Earth Data)
+neighbours <- readShapePoly('data/neighbours', proj4string=CRS('+proj=longlat +ellps=WGS84'))
+
+
+##################################################################
+## Kriging results
+##################################################################
+load('data/krig.RData')
+
+datGef <- as.data.frame(spGef)
+
+G0yCMSAF <- raster('data/G0yCMSAF.grd')
+gefCMSAF <- brick('data/gefCMSAF')
 
 elevMask <- aggregate(elevMask, fact=3.6)
 elevMask <- resample(elevMask, G0yCMSAF)
@@ -574,24 +618,30 @@ brickG0y <- stack(G0yCMSAF, raster(G0yKrig, 1))
 difG0y <- raster(G0yKrig, 1)- G0yCMSAF
 
 brickFixed <- stack(FixedCMSAF, raster(FixedKrig, 1))
-layerNames(brickFixed) <- c('CMSAF', 'SIAR+CMSAF')
+names(brickFixed) <- c('CMSAF', 'SIAR+CMSAF')
 
 difFixed <- raster(FixedKrig, 1)- FixedCMSAF
 
 brickHoriz <- stack(HorizCMSAF, raster(HorizKrig, 1))
-layerNames(brickHoriz) <- c('CMSAF', 'SIAR+CMSAF')
+names(brickHoriz) <- c('CMSAF', 'SIAR+CMSAF')
 
 difHoriz <- raster(HorizKrig, 1)- HorizCMSAF
 
 brickTwo <- stack(TwoCMSAF, raster(TwoKrig, 1))
-layerNames(brickTwo) <- c('CMSAF', 'SIAR+CMSAF')
+names(brickTwo) <- c('CMSAF', 'SIAR+CMSAF')
 
 difTwo <- raster(TwoKrig, 1)- TwoCMSAF
 
+## intervals with equal number of stations
 nIntervals <- 8
-latEqualCount <- co.intervals(datGef$lat, nIntervals)## intervals with equal number of stations
+latEqualCount <- co.intervals(datGef$lat,
+                              nIntervals,
+                              overlap=0.1)
 latEqualCount[1,1] <- ymin(G0yCMSAF)
 latEqualCount[nIntervals,2] <- ymax(G0yCMSAF)
+
+nStations <- apply(latEqualCount, 1,
+                   function(x)sum(datGef$lat >= x[1] & datGef$lat <= x[2]))
 
 latCutLabels <- apply(latEqualCount, 1, function(x){
   x <- signif(x, 3)
@@ -599,21 +649,21 @@ latCutLabels <- apply(latEqualCount, 1, function(x){
         collapse='', sep='')})
 
 latEqualCount <- cbind(latEqualCount, seq_len(nIntervals))
-latEqualCountRaster <- raster::reclass(init(G0yCMSAF, v='y'), latEqualCount)
+latEqualCountRaster <- reclassify(init(G0yCMSAF, v='y'), latEqualCount)
 
-brickDif <- stack(difG0y/G0yCMSAF,
-                  difFixed/FixedCMSAF,
-                  difHoriz/HorizCMSAF,
-                  difTwo/TwoCMSAF,
+brickDif <- stack(difG0y/G0yCMSAF * 100,
+                  difFixed/FixedCMSAF * 100,
+                  difHoriz/HorizCMSAF * 100,
+                  difTwo/TwoCMSAF * 100,
                   latEqualCountRaster)
-layerNames(brickDif) <- c('G0', 'Fixed', 'Horiz', 'Two', 'latitude')
+names(brickDif) <- c('G0', 'Fixed', 'Horiz', 'Two', 'latitude')
 
 
 brickKrig <- stack(raster(G0yKrig, 1),
                  raster(FixedKrig, 1),
                  raster(HorizKrig, 1),
                  raster(TwoKrig, 1))
-layerNames(brickKrig) <- c('G0', 'Fixed', 'Horiz', 'Two')
+names(brickKrig) <- c('G0', 'Fixed', 'Horiz', 'Two')
 
 
 ########################
@@ -628,8 +678,8 @@ stats <- function(p, o, ...){
   RMSDc <- sd(d, na.rm=TRUE)
   RMSD <- sqrt(MBD^2 + RMSDc^2)
   MAD <- mean(abs(d), na.rm=TRUE)
-  res <- data.frame(sdP=SDp, sdO=SDo, MBD=MBD/meanO, MBDabs=abs(MBD)/meanO,
-                    RMSDc=RMSDc/meanO, RMSD=RMSD/meanO, MAD=MAD/meanO)
+  res <- data.frame(sdP=SDp, sdO=SDo, MBD=MBD/meanO*100, ##MBDabs=abs(MBD)/meanO*100,
+                    RMSDc=RMSDc/meanO*100, RMSD=RMSD/meanO*100, MAD=MAD/meanO*100)
   res
 }
 
@@ -641,7 +691,7 @@ statPoints <- with(datGef,
                          stats(HorizCMSAF, HorizSIAR),
                          stats(TwoCMSAF, TwoSIAR)))
 rownames(statPoints) <- c('G0', 'Fixed', 'N-S Horiz', 'Two-axis')
-print(xtable(statPoints, digits=3), booktabs=TRUE)
+print(xtable(statPoints, digits=2), booktabs=TRUE)
 
 intG0y <- seq(0, .35, by=0.05)
 cG0 <- with(datGef, cut(abs(difG0y/G0ySIAR), intG0y))
@@ -652,7 +702,7 @@ statPointsKrig <- with(datGef, rbind(stats(G0yKrig, G0ySIAR),
                                      stats(HorizKrig, HorizSIAR),
                                      stats(TwoKrig, TwoSIAR)))
 rownames(statPointsKrig) <- c('G0', 'Fixed', 'N-S Horiz', 'Two-axis')
-print(xtable(statPointsKrig, digits=3), booktabs=TRUE)
+print(xtable(statPointsKrig, digits=2), booktabs=TRUE)
 
 
 statKrigCMSAF <- cellStats(stack(difG0y,
@@ -674,11 +724,11 @@ sdKrig <- cellStats(stack(raster(G0yKrig,1),
                             raster(HorizKrig, 1),
                             raster(TwoKrig, 1)),
                       sd, na.rm=1)
-statKrigCMSAF <- sweep(statKrigCMSAF, 1, meanCMSAF, FUN='/')
+statKrigCMSAF <- sweep(statKrigCMSAF, 1, meanCMSAF, FUN='/')*100
 statKrigCMSAF <- cbind(sdKrig, sdCMSAF, statKrigCMSAF)
 rownames(statKrigCMSAF) <- c('G0', 'Fixed', 'N-S Horiz', 'Two-axis')
 
-print(xtable(statKrigCMSAF, digits=3), booktabs=TRUE)
+print(xtable(statKrigCMSAF, digits=2), booktabs=TRUE)
 
 
 ################################################################################
@@ -727,8 +777,11 @@ trellis.device(pdf, file='figs/bubbleRMSDm.pdf')
 bubbles(spRMSDm, n=10, size=c(0.3, 1.1), pwr.size=0.5,
         layout=c(4, 3),
         style='fisher', alpha=1,
-        pal=rev(BTC(n=9))) + 
-  layer_(sp.lines(mapaSHP, lwd=0.3))
+        pal=rev(BTC(n=9))) +
+  layer_({
+    sp.lines(mapaSHP, lwd=0.3)
+    sp.polygons(neighbours, col='black', fill='lightgray')
+    })
 dev.off()
 
 system('pdfcrop figs/bubbleRMSDm.pdf figs/bubbleRMSDm_crop.pdf') ##without margins
@@ -738,7 +791,11 @@ bubbles(spMBDm, n=10, size=c(0.3, 1.1), pwr.size=0.5,
         layout=c(4, 3),
         style='fisher', alpha=1,
         pal=rev(BTC(n=9))) + ##brewer.pal(name='Blues', n=9)) + 
-  layer_(sp.lines(mapaSHP, lwd=0.3))
+  layer_({
+    sp.lines(mapaSHP, lwd=0.3)
+    sp.polygons(neighbours, col='black', fill='lightgray')
+    })
+
 dev.off()
 system('pdfcrop figs/bubbleMBDm.pdf figs/bubbleMBDm_crop.pdf') ##without margins
 
@@ -748,7 +805,11 @@ bubbles(spSIAR['MBDabs.G0'], n=10, size=c(0.3, 1.1), pwr.size=0.5,
         strip=strip.custom(strip.levels=FALSE),
         style='fisher', alpha=1,
         pal=rev(BTC(n=9))) + ##brewer.pal(name='Blues', n=9)) + 
-  layer_(sp.lines(mapaSHP, lwd=0.3))
+  layer_({
+    sp.lines(mapaSHP, lwd=0.3)
+    sp.polygons(neighbours, col='black', fill='lightgray')
+    })
+
 dev.off()
 system('pdfcrop figs/bubbleMBDG0.pdf figs/bubbleMBDG0_crop.pdf') ##without margins
 
@@ -757,7 +818,11 @@ bubbles(spSIAR['MAD.G0'], n=10, size=c(0.3, 1.1), pwr.size=0.5,
         strip=strip.custom(strip.levels=FALSE),
         style='fisher', alpha=1,
         pal=rev(BTC(n=9))) + ##brewer.pal(name='Blues', n=9)) + 
-  layer_(sp.lines(mapaSHP, lwd=0.3))
+  layer_({
+    sp.lines(mapaSHP, lwd=0.3)
+    sp.polygons(neighbours, col='black', fill='lightgray')
+    })
+
 dev.off()
 system('pdfcrop figs/bubbleMADG0.pdf figs/bubbleMADG0_crop.pdf') ##without margins
 
@@ -766,7 +831,11 @@ bubbles(spSIAR['RMSD.G0'], n=10, size=c(0.3, 1.1), pwr.size=0.5,
         strip=strip.custom(strip.levels=FALSE),
         style='fisher', alpha=1,
         pal=rev(BTC(n=9))) + ##brewer.pal(name='Blues', n=9)) + 
-  layer_(sp.lines(mapaSHP, lwd=0.3))
+  layer_({
+    sp.lines(mapaSHP, lwd=0.3)
+    sp.polygons(neighbours, col='black', fill='lightgray')
+    })
+
 dev.off()
 system('pdfcrop figs/bubbleRMSDG0.pdf figs/bubbleRMSDG0_crop.pdf') ##without margins
 
@@ -775,7 +844,11 @@ bubbles(spSIAR['RMSDc.G0'], n=10, size=c(0.3, 1.1), pwr.size=0.5,
         strip=strip.custom(strip.levels=FALSE),
         style='fisher', alpha=1,
         pal=rev(BTC(n=9))) + ##brewer.pal(name='Blues', n=9)) + 
-  layer_(sp.lines(mapaSHP, lwd=0.3))
+  layer_({
+    sp.lines(mapaSHP, lwd=0.3)
+    sp.polygons(neighbours, col='black', fill='lightgray')
+    })
+
 dev.off()
 system('pdfcrop figs/bubbleRMSDcG0.pdf figs/bubbleRMSDcG0_crop.pdf') ##without margins
 
@@ -827,14 +900,18 @@ dev.off()
 
 
 spDif <- spGef[c('difG0y', 'difFixed', 'difHoriz', 'difTwo')]
-spDif@data <- spDif@data/datGef[,c('G0ySIAR', 'FixedSIAR', 'HorizSIAR', 'TwoSIAR')]
+spDif@data <- spDif@data/spGef[,c('G0ySIAR', 'FixedSIAR', 'HorizSIAR', 'TwoSIAR')]@data
 names(spDif) <- c('G0', 'Fixed', 'N-S Horiz', 'Two axis')
 
 trellis.device(pdf, file='figs/bubbleDif.pdf')
 bubbles(spDif, n=8, size=c(0.3, 1.1), pwr.size=0.5,
         style='fisher', alpha=1,
         pal=rev(BTC(n=9))) + ##brewer.pal(name='Blues', n=9)) + 
-  layer_(sp.lines(mapaSHP, lwd=0.3))
+  layer_({
+    sp.lines(mapaSHP, lwd=0.3)
+    sp.polygons(neighbours, col='black', fill='lightgray')
+    })
+
 dev.off()
 system('pdfcrop figs/bubbleDif.pdf figs/bubbleDif_crop.pdf') ##without margins
 
@@ -846,7 +923,10 @@ trellis.device(pdf, file='figs/bubbleDifKrig.pdf')
 bubbles(spDifKrig, n=8, size=c(0.3, 1.1), pwr.size=0.5,
         style='fisher', alpha=1,
         pal=rev(BTC(n=9))) + ##brewer.pal(name='Blues', n=9)) + 
-  layer_(sp.lines(mapaSHP, lwd=0.3))
+  layer_({
+    sp.lines(mapaSHP, lwd=0.3)
+    sp.polygons(neighbours, col='black', fill='lightgray')
+    })
 dev.off()
 system('pdfcrop figs/bubbleDifKrig.pdf figs/bubbleDifKrig_crop.pdf') ##without margins
 
@@ -860,11 +940,15 @@ p <- spplot(spSIAR['Comunidad'],
        col.regions=brewer.pal(n=12, 'Paired'),  
        key.space='right', scales=list(draw=TRUE))
 
+terrainTheme <- rasterTheme(region=terrain.colors(15))
+terrainTheme$panel.background$col <- 'lightblue' ##Sea
+
 trellis.device(pdf, file='figs/mapaSIAR.pdf')
-levelplot(elevMask, col.regions=terrain.colors,##terrain_hcl,
+levelplot(elevMask, par.settings=terrainTheme,
           panel=panel.levelplot.raster, interpolate=TRUE,
           colorkey=list(raster=TRUE, interpolate=TRUE),
-          margin=FALSE) + 
+          margin=FALSE) +
+  layer(sp.polygons(neighbours, col='black', fill='lightgray')) +
   layer(sp.points(spSIAR[spSIAR$outTolerance,], pch=16, col='red', cex=0.4, alpha=0.8)) +
   layer(sp.points(spSIAR[!spSIAR$outTolerance,], pch=16, col='darkblue', cex=0.4, alpha=0.8)) + 
   layer(sp.lines(mapaSHP, lwd=0.3))
@@ -877,10 +961,13 @@ system('pdfcrop figs/mapaSIAR.pdf figs/mapaSIAR_crop.pdf') ##without margins
 ## G0
 ##########
 
+radTheme <- modifyList(rasterTheme(),
+                       list(panel.background=list(col=adjustcolor('lightskyblue1', alpha=0.3))))
 trellis.device(pdf, file='figs/G0yCMSAF.pdf')
-levelplot(G0yCMSAF, panel=panel.levelplot.raster, par.settings=BTCTheme) +
-   layer(sp.points(spSIAR, pch=19, cex=0.3, col='black')) +
-   layer(sp.lines(mapaSHP, lwd=0.5))
+levelplot(G0yCMSAF, panel=panel.levelplot.raster, par.settings=radTheme) +
+  layer(sp.polygons(neighbours, col='black', fill='lightgray')) +
+  layer(sp.points(spSIAR, pch=19, cex=0.3, col='black')) +
+  layer(sp.lines(mapaSHP, lwd=0.5))
 dev.off()
 
 trellis.device(pdf, file='figs/difG0y.pdf')
@@ -914,20 +1001,31 @@ dev.off()
 
 
 trellis.device(pdf, file='figs/G0yKrig.pdf')
-levelplot(G0yKrig, layer='pred', panel=panel.levelplot.raster, par.settings=BTCTheme) +
+levelplot(G0yKrig, layer='pred', panel=panel.levelplot.raster, par.settings=radTheme) +
+  layer(sp.polygons(neighbours, col='black', fill='lightgray')) +
   layer(sp.points(spGef, pch=19, cex=0.3, col='black')) +
   layer(sp.lines(mapaSHP))
 dev.off()
 
-trellis.device(pdf, file='figs/difG0yKrigCMSAF.pdf')
-rangeG0y <- c(minValue(difG0y/G0yCMSAF), maxValue(difG0y/G0yCMSAF))
-maxG0y <- max(abs(rangeG0y))
-rangeG0y <- c(-maxG0y, maxG0y)
+RdBuTheme <- modifyList(RdBuTheme(),
+                        list(panel.background=list(col=adjustcolor('lightskyblue1', alpha=0.3))))
 
-pG0y <- levelplot(difG0y/G0yCMSAF, par.settings=RdBuTheme, at=pretty(rangeG0y, 15)) +
+## Same breaks for all plots
+minDif <- min(minValue(brickDif)[1:4])
+maxDif <- max(maxValue(brickDif)[1:4])
+maxAbsDif <- max(abs(c(minDif, maxDif)))
+rangeDif <- c(-maxAbsDif, maxAbsDif)
+atDif <- pretty(rangeDif, 15)
+## rangeG0y <- c(minValue(difG0y/G0yCMSAF), maxValue(difG0y/G0yCMSAF))
+## maxG0y <- max(abs(rangeG0y))
+## rangeG0y <- c(-maxG0y, maxG0y)
+
+trellis.device(pdf, file='figs/difG0yKrigCMSAF.pdf')
+levelplot(brickDif, layers='G0', par.settings=RdBuTheme,
+          at=atDif, panel=panel.levelplot.raster) +
+  layer(sp.polygons(neighbours, col='black', fill='lightgray')) +
   layer(sp.points(spGef, pch=19, cex=0.3, col='black')) +
   layer(sp.lines(mapaSHP))
-pG0y
 dev.off()
 
 trellis.device(pdf, file='figs/difG0yKrigCMSAFBWplot.pdf')
@@ -970,17 +1068,20 @@ xyplot(difFixed/FixedSIAR~lat, data=datGef,
 dev.off()
 
 levelplot(brickFixed) +
+  layer(sp.polygons(neighbours, col='black', fill='lightgray')) +
   layer(sp.points(spGef, pch=19, cex=0.3, col='black')) +
   layer(sp.lines(mapaSHP))
 
+## rangeFixed <- c(minValue(difFixed/FixedCMSAF), maxValue(difFixed/FixedCMSAF))
+## maxFixed <- max(abs(rangeFixed))
+## rangeFixed <- c(-maxFixed, maxFixed)
+
 trellis.device(pdf, file='figs/difFixedKrigCMSAF.pdf')
-rangeFixed <- c(minValue(difFixed/FixedCMSAF), maxValue(difFixed/FixedCMSAF))
-maxFixed <- max(abs(rangeFixed))
-rangeFixed <- c(-maxFixed, maxFixed)
-pFixed <- levelplot(difFixed/FixedCMSAF, par.settings=RdBuTheme, at=pretty(rangeFixed, 15)) +
+levelplot(brickDif, layers='Fixed', par.settings=RdBuTheme,
+          at=atDif, panel=panel.levelplot.raster) +
+  layer(sp.polygons(neighbours, col='black', fill='lightgray')) +
   layer(sp.points(spGef, pch=19, cex=0.3, col='black')) +
   layer(sp.lines(mapaSHP))
-pFixed
 dev.off()
 
 trellis.device(pdf, file='figs/difFixedKrigCMSAFBWplot.pdf')
@@ -1017,17 +1118,20 @@ xyplot(difHoriz/HorizSIAR~lat, data=datGef,
 dev.off()
 
 levelplot(brickHoriz) +
+  layer(sp.polygons(neighbours, col='black', fill='lightgray')) +
   layer(sp.points(spGef, pch=19, cex=0.3, col='black')) +
   layer(sp.lines(mapaSHP))
 
+## rangeHoriz <- c(minValue(difHoriz/HorizCMSAF), maxValue(difHoriz/HorizCMSAF))
+## maxHoriz <- max(abs(rangeHoriz))
+## rangeHoriz <- c(-maxHoriz, maxHoriz)
+
 trellis.device(pdf, file='figs/difHorizKrigCMSAF.pdf')
-rangeHoriz <- c(minValue(difHoriz/HorizCMSAF), maxValue(difHoriz/HorizCMSAF))
-maxHoriz <- max(abs(rangeHoriz))
-rangeHoriz <- c(-maxHoriz, maxHoriz)
-pHoriz <- levelplot(difHoriz/HorizCMSAF, par.settings=RdBuTheme, at=pretty(rangeHoriz, 15)) +
+levelplot(brickDif, layers='Horiz', par.settings=RdBuTheme,
+          at=atDif, panel=panel.levelplot.raster) +
+  layer(sp.polygons(neighbours, col='black', fill='lightgray')) +
   layer(sp.points(spGef, pch=19, cex=0.3, col='black')) +
   layer(sp.lines(mapaSHP))
-pHoriz
 dev.off()
 
 trellis.device(pdf, file='figs/difHorizKrigCMSAFBWplot.pdf')
@@ -1063,22 +1167,37 @@ xyplot(difTwo/TwoSIAR~lat, data=datGef,
 dev.off()
 
 levelplot(brickTwo) +
+  layer(sp.polygons(neighbours, col='black', fill='lightgray')) +
   layer(sp.points(spGef, pch=19, cex=0.3, col='black')) +
   layer(sp.lines(mapaSHP))
 
+## rangeTwo <- c(minValue(difTwo/TwoCMSAF), maxValue(difTwo/TwoCMSAF))
+## maxTwo <- max(abs(rangeTwo))
+## rangeTwo <- c(-maxTwo, maxTwo)
+
 trellis.device(pdf, file='figs/difTwoKrigCMSAF.pdf')
-rangeTwo <- c(minValue(difTwo/TwoCMSAF), maxValue(difTwo/TwoCMSAF))
-maxTwo <- max(abs(rangeTwo))
-rangeTwo <- c(-maxTwo, maxTwo)
-pTwo <- levelplot(difTwo/TwoCMSAF, par.settings=RdBuTheme, at=pretty(rangeTwo, 15)) +
+levelplot(brickDif, layers='Two', par.settings=RdBuTheme,
+          at=atDif, panel=panel.levelplot.raster) +
+  layer(sp.polygons(neighbours, col='black', fill='lightgray')) +
   layer(sp.points(spGef, pch=19, cex=0.3, col='black')) +
   layer(sp.lines(mapaSHP))
-pTwo
 dev.off()
 
 trellis.device(pdf, file='figs/difTwoKrigCMSAFBWplot.pdf')
 bwplot(Two~latitude, data=brickDif,
        xlab='Latitude', ylab='',
        scales=list(x=list(rot=30,
+                     labels=latCutLabels)))
+dev.off()
+
+trellis.device(pdf, file='figs/difKrigCMSAFBWplot.pdf', width=10)
+bwplot(G0 + Fixed + Horiz + Two ~ latitude, data=brickDif,
+       outer=TRUE, layout=c(4, 1),
+       xlab='Latitude', ylab='',
+       strip=strip.custom(factor.levels =
+         c('Horizontal Irradiation', 'Fixed Plane',
+           'NS Hor. Axis Tracker', 'Two Axis'),
+         par.strip.text=list(cex=0.8)),
+       scales=list(x=list(rot=45, cex=0.6,
                      labels=latCutLabels)))
 dev.off()
