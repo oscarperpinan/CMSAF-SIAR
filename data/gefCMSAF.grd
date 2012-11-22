@@ -1,0 +1,27 @@
+[general] 
+creator=R package 'raster' 
+created= 2012-04-18 14:11:08 
+[georeference] 
+nrows= 285 
+ncols= 501 
+xmin= -10.015 
+ymin= 35.465 
+xmax= 5.015 
+ymax= 44.015 
+projection= +proj=longlat +ellps=WGS84 
+[data] 
+datatype= FLT4S 
+byteorder= little 
+nbands= 3 
+bandorder= BIL 
+categorical= FALSE 
+minvalue= 1266.06286621094:1679.54571533203:1490.12902832031 
+maxvalue= 2060.26055908203:3063.03784179688:2733.29345703125 
+nodatavalue= -3.4e+38 
+[legend] 
+legendtype=  
+values=  
+color=  
+[description] 
+layername= Fixed:Two:Horiz 
+history=  
