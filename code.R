@@ -62,6 +62,12 @@ stackSIS <- stack(listFich)
 stackSIS <- stackSIS*24 ##para pasar de W/m2 (irradiancia media) a Wh/m2
 projection(stackSIS) <- projSIAR
 
+setwd(old)
+
+writeRaster(stackSIS, filename='data/SISd2010', overwrite=TRUE)
+
+old <- setwd('~/Datos/CMSAF/2010_2011')
+
 listFich <- dir(pattern='SISdm2011')
 stackSIS <- stack(listFich)
 stackSIS <- stackSIS*24 
@@ -789,6 +795,45 @@ system('pdfcrop FixedKrig.pdf FixedKrig.pdf') ##without margins
 system('pdfcrop HorizKrig.pdf HorizKrig.pdf') ##without margins
 system('pdfcrop TwoKrig.pdf TwoKrig.pdf') ##without margins
 
+## Comparative between fixed and tracking systems
+## NS Horiz - Fixed
+difKEDHorizFixed <- raster(HorizKrig,1)/raster(FixedKrig,1) - 1
+rangeHorizFixed <- c(minValue(difKEDHorizFixed), maxValue(difKEDHorizFixed))
+rangeHorizFixed
+maxHorizFixed <- max(abs(rangeHorizFixed))
+rangeHorizFixed <- c(-maxHorizFixed, maxHorizFixed)
+
+levelplot(difKEDHorizFixed, par.settings=RdBuTheme ) +
+  layer(sp.points(spGef, pch=19, cex=0.3, col='black')) +
+  layer(sp.lines(mapaSHP))
+
+## Two - Fixed
+difKEDTwoFixed<-raster(TwoKrig,1)/raster(FixedKrig,1) - 1
+rangeTwoFixed <- c(minValue(difKEDTwoFixed), maxValue(difKEDTwoFixed))
+rangeTwoFixed
+maxTwoFixed <- max(abs(rangeTwoFixed))
+rangeTwoFixed <- c(-maxTwoFixed, maxTwoFixed)
+
+levelplot(difKEDTwoFixed, par.settings=RdBuTheme ) +
+  layer(sp.points(spGef, pch=19, cex=0.3, col='black')) +
+  layer(sp.lines(mapaSHP))
+
+## Two - Horiz
+difKEDTwoHoriz<-raster(TwoKrig,1)/raster(HorizKrig,1) - 1
+rangeTwoHoriz <- c(minValue(difKEDTwoHoriz), maxValue(difKEDTwoHoriz))
+rangeTwoHoriz
+maxTwoHoriz <- max(abs(rangeTwoHoriz))
+rangeTwoHoriz <- c(-maxTwoHoriz, maxTwoHoriz)
+levelplot(difKEDTwoHoriz/HorizKrig, par.settings=RdBuTheme ) +
+  layer(sp.points(spGef, pch=19, cex=0.3, col='black')) +
+  layer(sp.lines(mapaSHP))
+
+compSystems <- stack(difKEDHorizFixed, difKEDTwoFixed, difKEDTwoHoriz)
+names(compSystems) <- c('Horiz.Fixed', 'Two.Fixed', 'Two.Horiz')
+
+trellis.device(pdf, file='compSystems.pdf')
+histogram(compSystems, layout=c(3, 1))
+dev.off()
 
 ##############################
 ## Comparison SIAR-CMSAF
