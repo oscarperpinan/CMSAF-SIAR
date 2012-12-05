@@ -59,7 +59,7 @@ old <- setwd('~/Datos/CMSAF/2010_2011')
 
 listFich <- dir(pattern='SISdm2010')
 stackSIS <- stack(listFich)
-stackSIS <- stackSIS*24 ##para pasar de W/m2 (irradiancia media) a Wh/m2
+stackSIS <- stackSIS*24 ##to move from W/m2 (averaged irradiance) to Wh/m2
 projection(stackSIS) <- projSIAR
 
 setwd(old)
