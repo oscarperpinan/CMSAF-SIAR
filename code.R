@@ -1,7 +1,7 @@
 library(sp)
 library(raster)
-setOptions(todisk=FALSE)
-setOptions(chunksize = 1e+06, maxmemory = 1e+07)
+rasterOptions(todisk=FALSE)
+rasterOptions(chunksize = 1e+06, maxmemory = 1e+07)
 library(maptools)
 library(gstat)
 
