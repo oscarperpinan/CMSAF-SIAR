@@ -18,7 +18,7 @@ library(colorspace)
 library(classInt)
 
 ## Change the folder where the github repository is located
-setwd('~/Investigacion/DocsPropios/CMSAF_SIAR/R/')
+setwd('~/R/CMSAF_SIAR/')
 ## Jump to GRAPHICS section is you only need to produce figures
 
 ################################################################################
