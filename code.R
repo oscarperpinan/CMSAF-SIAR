@@ -70,7 +70,7 @@ old <- setwd('~/Datos/CMSAF/2010_2011')
 
 listFich <- dir(pattern='SISdm2011')
 stackSIS <- stack(listFich)
-stackSIS <- stackSIS*24 
+stackSIS <- stackSIS*24
 projection(stackSIS) <- projSIAR
 
 setwd(old)
@@ -126,9 +126,9 @@ gefList <- function(x){
   ## Those days with G0d>Bo0d or with G0d too low are erroneous
   Bo0d <- gefFixed@solD$Bo0d
   G0d <- gefFixed@G0D$G0d
-  err <- (G0d>Bo0d) | (G0d < 0.01*Bo0d) 
+  err <- (G0d>Bo0d) | (G0d < 0.01*Bo0d)
   result[err] <- NA
-  
+
   aggregate(result, by=year, sum, na.rm=1)/1000
   }
 
@@ -153,11 +153,11 @@ gefParallel <- function(data, filename="", nodes=detectCores(), blocks=8,...){
     lat <- g0[1]
     g0d <- list(file = zoo(data.frame(G0 = g0[2:n]),  idx),
                 lat = lat)
-    gefFixed <- calcGef(lat=lat, dataRad =  g0d, 
+    gefFixed <- calcGef(lat=lat, dataRad =  g0d,
                         modeRad = 'bd',  modeTrk='fixed')
-    gef2x <- calcGef(lat = lat, dataRad = gefFixed, 
+    gef2x <- calcGef(lat = lat, dataRad = gefFixed,
                      modeRad = 'prev',  modeTrk='two')
-    gefHoriz <- calcGef(lat =  lat, dataRad = gefFixed, 
+    gefHoriz <- calcGef(lat =  lat, dataRad = gefFixed,
                         modeRad = 'prev',  modeTrk='horiz')
     resultFixed <- as.numeric(as.data.frameY(gefFixed)$Gefd)
     result2x <- as.numeric(as.data.frameY(gef2x)$Gefd)
@@ -167,7 +167,7 @@ gefParallel <- function(data, filename="", nodes=detectCores(), blocks=8,...){
   }
 
   ## List with the indices of blocks for each node
-  iCluster <- splitIndices(bs$n, nodes) 
+  iCluster <- splitIndices(bs$n, nodes)
   resCl <- mclapply(iCluster,
                     ## Each node receives an element of iCluster, a set of indices
                     function(icl){
@@ -193,7 +193,7 @@ gefParallel <- function(data, filename="", nodes=detectCores(), blocks=8,...){
   ## Each element of the list is a matrix with 3 columns (resCl0)
   ## corresponding to a block as defined by bs.
   resCl <- do.call(rbind, resCl)
-  
+
   out <- brick(data, nl=3) ## 3 layers, one for each tracking mode
   layerNames(out)=c('Fixed', 'Two', 'Horiz')
   out <- setValues(out, resCl)
@@ -327,7 +327,7 @@ applyStats <- function(p, o, ...){
                     RMSDc=RMSDc/meanO, RMSD=RMSD/meanO, MAD=MAD/meanO)
   res
 }
-  
+
 g0Stats <- applyStats(g0CMSAF, g0SIAR)
 names(g0Stats) <- paste(names(g0Stats), 'G0', sep='.')
 spSIAR <- spCbind(spSIAR, g0Stats)
@@ -338,20 +338,6 @@ spSIAR <- spCbind(spSIAR, g0Stats)
 #### KED
 ##################################################
 
-krigeRaster <- function(formula, data, raster, ...){
-  latLayer <- init(raster, v='y')
-  lonLayer <- init(raster, v='x')
-
-  grd <- as(stack(lonLayer, latLayer, raster), 'SpatialGridDataFrame')
-  names(grd) <- c('lon', 'lat', deparse(substitute(raster)))
-
-  proj4string(data) <- proj4string(grd) ## seems to be a bug in proj4string<- with SpatialGrid
-  resSP <- krige(formula, data, grd, ...)
-  res <- as(resSP, 'RasterStack')
-  names(res) <- c('pred', 'var')
-  projection(res) <- projection(raster)
-  res
-}
 
 ## Universal kriging
 vgmCMSAF <- variogram(G0ySIAR~G0yCMSAF, spSIAR)##, width=10, cutoff=500)
@@ -359,7 +345,12 @@ plot(vgmCMSAF)
 
 fitvgmCMSAF <- fit.variogram(vgmCMSAF, vgm(model='Nug')) ##pure nugget effect...no spatial autocorrelation
 plot(vgmCMSAF, fitvgmCMSAF)
-G0yKrig <- krigeRaster(G0ySIAR~G0yCMSAF, spSIAR, G0yCMSAF, model=fitvgmCMSAF)
+
+gModel <- gstat(NULL, id='G0yKrig',
+                formula= G0ySIAR~G0yCMSAF,
+                locations=spSIAR, model=fitvgmCMSAF)
+
+G0yKrig <- interpolate(G0yCMSAF, gModel, xyOnly=FALSE)
 
 ##################################################
 #### Effective Irradiation
@@ -407,7 +398,11 @@ modelFixed <- vgm(model='Nug')
 fitvgmFixed <- fit.variogram(vgmFixed, modelFixed)
 plot(vgmFixed, fitvgmFixed)
 
-FixedKrig <- krigeRaster(FixedSIAR~G0yCMSAF, spGef, G0yCMSAF, model=fitvgmFixed)
+gModel <- gstat(NULL, id='FixedKrig',
+                formula= FixedSIAR~G0yCMSAF,
+                locations=spGef, model=fitvgmFixed)
+
+FixedKrig <- interpolate(G0yCMSAF, gModel, xyOnly=FALSE)
 
 
 HorizCMSAF <- raster(gefCMSAF, layer='Horiz')
@@ -418,8 +413,11 @@ modelHoriz <- vgm(psill=17000, model='Sph', range=200, nugget=5000)
 fitvgmHoriz <- fit.variogram(vgmHoriz, modelHoriz)
 plot(vgmHoriz, fitvgmHoriz)
 
-HorizKrig <- krigeRaster(HorizSIAR~G0yCMSAF, spGef, G0yCMSAF, model=fitvgmHoriz)
+gModel <- gstat(NULL, id='HorizKrig',
+                formula= HorizSIAR~G0yCMSAF,
+                locations=spGef, model=fitvgmHoriz)
 
+HorizKrig <- interpolate(G0yCMSAF, gModel, xyOnly=FALSE)
 
 TwoCMSAF <- raster(gefCMSAF, layer='Two')
 
@@ -429,14 +427,18 @@ modelTwo <- vgm(psill=17000, model='Sph', range=200, nugget=5000)
 fitvgmTwo <- fit.variogram(vgmTwo, modelTwo)
 plot(vgmTwo, fitvgmTwo)
 
-TwoKrig <- krigeRaster(TwoSIAR~G0yCMSAF, spGef, G0yCMSAF, model=fitvgmTwo)
+gModel <- gstat(NULL, id='TwoKrig',
+                formula= TwoSIAR~G0yCMSAF,
+                locations=spGef, model=fitvgmTwo)
+
+TwoKrig <- interpolate(G0yCMSAF, gModel, xyOnly=FALSE)
 
 
 ## Extract points from kriging
-krigExtract <- data.frame(G0yKrig=extract(raster(G0yKrig, 1), spGef),
-                          FixedKrig=extract(raster(FixedKrig, 1), spGef),
-                          HorizKrig=extract(raster(HorizKrig, 1), spGef),
-                          TwoKrig=extract(raster(TwoKrig, 1), spGef))
+krigExtract <- data.frame(G0yKrig=extract(G0yKrig, spGef),
+                          FixedKrig=extract(FixedKrig, spGef),
+                          HorizKrig=extract(HorizKrig, spGef),
+                          TwoKrig=extract(TwoKrig, spGef))
 
 spGef <- spCbind(spGef, krigExtract)
 spGef$difG0yKrig <- spGef$G0yKrig - spGef$G0ySIAR
@@ -572,23 +574,23 @@ difFixed <- raster(FixedKrig,1)-FixedCMSAF
 difTwo <- raster(TwoKrig,1)-TwoCMSAF
 difHoriz <- raster(HorizKrig,1)-HorizCMSAF
 
-brickG0y <- stack(G0yCMSAF, raster(G0yKrig, 1))
-difG0y <- raster(G0yKrig, 1)- G0yCMSAF
+brickG0y <- stack(G0yCMSAF, G0yKrig)
+difG0y <- G0yKrig- G0yCMSAF
 
-brickFixed <- stack(FixedCMSAF, raster(FixedKrig, 1))
+brickFixed <- stack(FixedCMSAF, FixedKrig)
 names(brickFixed) <- c('CMSAF', 'SIAR+CMSAF')
 
-difFixed <- raster(FixedKrig, 1)- FixedCMSAF
+difFixed <- FixedKrig- FixedCMSAF
 
-brickHoriz <- stack(HorizCMSAF, raster(HorizKrig, 1))
+brickHoriz <- stack(HorizCMSAF, HorizKrig)
 names(brickHoriz) <- c('CMSAF', 'SIAR+CMSAF')
 
-difHoriz <- raster(HorizKrig, 1)- HorizCMSAF
+difHoriz <- HorizKrig- HorizCMSAF
 
-brickTwo <- stack(TwoCMSAF, raster(TwoKrig, 1))
+brickTwo <- stack(TwoCMSAF, TwoKrig)
 names(brickTwo) <- c('CMSAF', 'SIAR+CMSAF')
 
-difTwo <- raster(TwoKrig, 1)- TwoCMSAF
+difTwo <- TwoKrig- TwoCMSAF
 
 ## intervals with equal number of stations
 nIntervals <- 8
@@ -617,10 +619,10 @@ brickDif <- stack(difG0y/G0yCMSAF * 100,
 names(brickDif) <- c('G0', 'Fixed', 'Horiz', 'Two', 'latitude')
 
 
-brickKrig <- stack(raster(G0yKrig, 1),
-                 raster(FixedKrig, 1),
-                 raster(HorizKrig, 1),
-                 raster(TwoKrig, 1))
+brickKrig <- stack(G0yKrig,
+                 FixedKrig,
+                 HorizKrig,
+                 TwoKrig)
 names(brickKrig) <- c('G0', 'Fixed', 'Horiz', 'Two')
 
 
@@ -678,9 +680,9 @@ statKrigCMSAF <- do.call(rbind, statKrigCMSAF)
 meanCMSAF <- cellStats(stack(G0yCMSAF, FixedCMSAF, HorizCMSAF, TwoCMSAF), mean, na.rm=1)
 sdCMSAF <- cellStats(stack(G0yCMSAF, FixedCMSAF, HorizCMSAF, TwoCMSAF), sd, na.rm=1)
 sdKrig <- cellStats(stack(raster(G0yKrig,1),
-                            raster(FixedKrig, 1),
-                            raster(HorizKrig, 1),
-                            raster(TwoKrig, 1)),
+                            FixedKrig,
+                            HorizKrig,
+                            TwoKrig),
                       sd, na.rm=1)
 statKrigCMSAF <- sweep(statKrigCMSAF, 1, meanCMSAF, FUN='/')*100
 statKrigCMSAF <- cbind(sdKrig, sdCMSAF, statKrigCMSAF)
@@ -704,7 +706,7 @@ setwd('~/Investigacion/DocsPropios/CMSAF_SIAR/figs')
 
 ##Plot the stations in a map
 p <- spplot(spSIAR['Comunidad'],
-       col.regions=brewer.pal(n=12, 'Paired'),  
+       col.regions=brewer.pal(n=12, 'Paired'),
        key.space='right', scales=list(draw=TRUE))
 
 terrainTheme <- rasterTheme(region=terrain.colors(15))
@@ -739,7 +741,7 @@ pHov
 dev.off()
 
 ##############################
-## KED Radiation Maps 
+## KED Radiation Maps
 ##############################
 
 radTheme <- modifyList(rasterTheme(),
@@ -843,7 +845,7 @@ medianDif <- zoo(apply(g0Dif/g0SIAR, 1, median, na.rm=1), index(g0Dif))
 quantDif <- zoo(t(apply(g0Dif/g0SIAR, 1, quantile, probs=c(0.05, 0.95), na.rm=1)), index(g0Dif))
 
 trellis.device(pdf, file='difG0d.pdf')
-p <- xyplot(g0Dif/g0SIAR, superpose=TRUE, 
+p <- xyplot(g0Dif/g0SIAR, superpose=TRUE,
             lwd=0.2, alpha=0.2, col='black',
             ylim=c(-1, 5),
             ylab=expression(G[d]^{CMSAF}*(0) / G[d]^{SIAR}*(0) -1),##~ ~(Wh/m^2)),
@@ -883,7 +885,7 @@ panel.bubbles <- function(x, y, subscripts, col, cex, ...){
 bubbles <- function(obj, n=7, style='fisher',
                     pal=brewer.pal(name='Blues', n=9),
                     size=c(0.3, 1.1), pwr.size=1, alpha=0.7,...){
-  
+
   xlim = sp:::bbexpand(bbox(obj)[1, ], 0.04)
   ylim = sp:::bbexpand(bbox(obj)[2, ], 0.04)
   scales <- list(draw = TRUE, cex=0.7)
@@ -892,22 +894,22 @@ bubbles <- function(obj, n=7, style='fisher',
   z <- stack(obj@data)
   z$ind <- factor(z$ind, levels=names(obj))
   data <- cbind(xy, z)
-  
+
   intervals <- classIntervals(z$values, n=n, style=style)
   nInt <- length(intervals$brks) - 1
 
   idx <- findCols(intervals)
-  
+
   op <- options(digits=2)
   tab <- classInt:::tableClassIntervals(cols = idx, brks = intervals$brks,
-                                        under = "under", over = "over", between = "-", 
+                                        under = "under", over = "over", between = "-",
                                         cutlabels = TRUE,
                                         intervalClosure = "left",
                                         dataPrecision = NULL)
   options(op)
 
   rval <- seq(1, 0, length=nInt)
-  cex.key <- size[2] - diff(size)*rval^pwr.size 
+  cex.key <- size[2] - diff(size)*rval^pwr.size
   cex <- cex.key[idx]
   pal <- colorRampPalette(pal)(nInt)
   col <- findColours(intervals, pal)
@@ -918,7 +920,7 @@ bubbles <- function(obj, n=7, style='fisher',
               points=list(col=col.key, pch=19, cex=cex.key))
 
   p <- xyplot(lat~lon|ind, data=data,
-         xlab='', ylab='', 
+         xlab='', ylab='',
          cex=cex, col=col, key=key, alpha=alpha,
          asp=mapasp(obj),
          scales=sp:::longlat.scales(obj, scales, xlim, ylim),
@@ -943,7 +945,7 @@ trellis.device(pdf, file='bubbleMBDm.pdf')
 bubbles(spMBDm, n=10, size=c(0.3, 1.1), pwr.size=0.5,
         layout=c(4, 3),
         style='fisher', alpha=1,
-        pal=rev(BTC(n=9))) + ##brewer.pal(name='Blues', n=9)) + 
+        pal=rev(BTC(n=9))) + ##brewer.pal(name='Blues', n=9)) +
   layer_({
     sp.polygons(mapaSHP, lwd=0.3)
     sp.polygons(neighbours, col='black', fill='lightgray')
@@ -957,7 +959,7 @@ trellis.device(pdf, file='bubbleMBDG0.pdf')
 bubbles(spSIAR['MBDabs.G0'], n=10, size=c(0.3, 1.1), pwr.size=0.5,
         strip=strip.custom(strip.levels=FALSE),
         style='fisher', alpha=1,
-        pal=rev(BTC(n=9))) + ##brewer.pal(name='Blues', n=9)) + 
+        pal=rev(BTC(n=9))) + ##brewer.pal(name='Blues', n=9)) +
   layer_({
     sp.polygons(mapaSHP, lwd=0.3)
     sp.polygons(neighbours, col='black', fill='lightgray')
@@ -970,7 +972,7 @@ trellis.device(pdf, file='bubbleMADG0.pdf')
 bubbles(spSIAR['MAD.G0'], n=10, size=c(0.3, 1.1), pwr.size=0.5,
         strip=strip.custom(strip.levels=FALSE),
         style='fisher', alpha=1,
-        pal=rev(BTC(n=9))) + ##brewer.pal(name='Blues', n=9)) + 
+        pal=rev(BTC(n=9))) + ##brewer.pal(name='Blues', n=9)) +
   layer_({
     sp.polygons(mapaSHP, lwd=0.3)
     sp.polygons(neighbours, col='black', fill='lightgray')
@@ -983,7 +985,7 @@ trellis.device(pdf, file='bubbleRMSDG0.pdf')
 bubbles(spSIAR['RMSD.G0'], n=10, size=c(0.3, 1.1), pwr.size=0.5,
         strip=strip.custom(strip.levels=FALSE),
         style='fisher', alpha=1,
-        pal=rev(BTC(n=9))) + ##brewer.pal(name='Blues', n=9)) + 
+        pal=rev(BTC(n=9))) + ##brewer.pal(name='Blues', n=9)) +
   layer_({
     sp.polygons(mapaSHP, lwd=0.3)
     sp.polygons(neighbours, col='black', fill='lightgray')
@@ -996,7 +998,7 @@ trellis.device(pdf, file='bubbleRMSDcG0.pdf')
 bubbles(spSIAR['RMSDc.G0'], n=10, size=c(0.3, 1.1), pwr.size=0.5,
         strip=strip.custom(strip.levels=FALSE),
         style='fisher', alpha=1,
-        pal=rev(BTC(n=9))) + ##brewer.pal(name='Blues', n=9)) + 
+        pal=rev(BTC(n=9))) + ##brewer.pal(name='Blues', n=9)) +
   layer_({
     sp.polygons(mapaSHP, lwd=0.3)
     sp.polygons(neighbours, col='black', fill='lightgray')
@@ -1059,7 +1061,7 @@ names(spDif) <- c('G0', 'Fixed', 'N-S Horiz', 'Two axis')
 trellis.device(pdf, file='bubbleDif.pdf')
 bubbles(spDif, n=8, size=c(0.3, 1.1), pwr.size=0.5,
         style='fisher', alpha=1,
-        pal=rev(BTC(n=9))) + ##brewer.pal(name='Blues', n=9)) + 
+        pal=rev(BTC(n=9))) + ##brewer.pal(name='Blues', n=9)) +
   layer_({
     sp.polygons(mapaSHP, lwd=0.3)
     sp.polygons(neighbours, col='black', fill='lightgray')
@@ -1075,7 +1077,7 @@ names(spDifKrig) <- c('G0', 'Fixed', 'N-S Horiz', 'Two axis')
 trellis.device(pdf, file='bubbleDifKrig.pdf')
 bubbles(spDifKrig, n=8, size=c(0.3, 1.1), pwr.size=0.5,
         style='fisher', alpha=1,
-        pal=rev(BTC(n=9))) + ##brewer.pal(name='Blues', n=9)) + 
+        pal=rev(BTC(n=9))) + ##brewer.pal(name='Blues', n=9)) +
   layer_({
     sp.polygons(mapaSHP, lwd=0.3)
     sp.polygons(neighbours, col='black', fill='lightgray')
