@@ -1,3 +1,7 @@
+library(xtable)
+library(colorspace)
+library(classInt)
+
 library(sp)
 library(raster)
 rasterOptions(todisk=FALSE)
@@ -13,9 +17,6 @@ library(solaR)
 
 library(parallel)
 
-library(xtable)
-library(colorspace)
-library(classInt)
 
 ## Change the folder where the github repository is located
 setwd('~/R/CMSAF_SIAR/')
@@ -350,6 +351,7 @@ gModel <- gstat(NULL, id='G0yKrig',
                 formula= G0ySIAR~G0yCMSAF,
                 locations=spSIAR, model=fitvgmCMSAF)
 
+names(G0yCMSAF) <- 'G0yCMSAF' ## needed for interpolate
 G0yKrig <- interpolate(G0yCMSAF, gModel, xyOnly=FALSE)
 
 ##################################################
