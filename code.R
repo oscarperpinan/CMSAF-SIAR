@@ -19,7 +19,8 @@ library(parallel)
 
 
 ## Change the folder where the github repository is located
-setwd('~/R/CMSAF_SIAR/')
+setwd('~/R/CMSAF-SIAR/')
+
 ## Jump to GRAPHICS section is you only need to produce figures
 
 ################################################################################
@@ -77,6 +78,33 @@ projection(stackSIS) <- projSIAR
 setwd(old)
 
 writeRaster(stackSIS, filename='data/SISd2011', overwrite=TRUE)
+
+##############################
+## hovmoller
+##############################
+
+SISd2010 <- brick('SISd2010.grd')
+idx2010 <- fBTd('serie', year=2010)
+SISd2010 <- setZ(SISd2010, idx2010)
+names(SISd2010) <- as.character(idx2010)
+
+SISd2011 <- brick('SISd2011.grd')
+idx2011 <- fBTd('serie', year=2011)
+SISd2011 <- setZ(SISd2011, idx2011)
+names(SISd2011) <- as.character(idx2011)
+
+SISd <- stack(SISd2010, SISd2011)
+SISd <- setZ(SISd, c(idx2010, idx2011))
+
+
+pHov <- hovmoller(SISd, add.contour=FALSE)
+trellis.device(pdf, file='hovmoller.pdf')
+pHov
+dev.off()
+
+##################################################################
+## Annual irradiation
+##################################################################
 
 G0yCMSAF2010 <- calc(SISd2010, fun=function(x)sum(x, na.rm=1)/1000,
                      filename='data/G0yCMSAF2010')
@@ -482,52 +510,36 @@ trellis.device(pdf, file='figs/variograms.pdf')
 pV + pM
 dev.off()
 
-################################################################################
+#######################################################################
 ## GRAPHICS
-################################################################################
+#######################################################################
 
-
-#########################
-## CMSAF daily data
-#########################
-##old <- setwd(tempdir())
-##download.file
-## unzip
-old <- setwd('~/Investigacion/DocsPropios/CMSAF_SIAR/data/')
-
-SISd2010 <- brick('SISd2010.grd')
-idx2010 <- fBTd('serie', year=2010)
-SISd2010 <- setZ(SISd2010, idx2010)
-names(SISd2010) <- as.character(idx2010)
-
-SISd2011 <- brick('SISd2011.grd')
-idx2011 <- fBTd('serie', year=2011)
-SISd2011 <- setZ(SISd2011, idx2011)
-names(SISd2011) <- as.character(idx2011)
-
-SISd <- stack(SISd2010, SISd2011)
-SISd <- setZ(SISd, c(idx2010, idx2011))
-
-setwd(old)
+load('data/krig.RData')
 
 ##############################
 ## Auxiliary data
 ##############################
 projSIAR <- CRS(projection(spSIAR))
 
+## Spanish altitude mask
+download.file('http://www.diva-gis.org/data/msk_alt/ESP_msk_alt.zip', 'ESP_msk_alt.zip')
+unzip('ESP_msk_alt.zip')
+elevMask <- raster('ESP_msk_alt')
+
 ## Spanish administrative boundaries
+neighbours <- readShapePoly('data/neighbours.shp')
+spain <- readShapePoly('data/spain.shp')
+
+## You don't need to run next code. It illustrates how to produce
+## previous ShapeFiles.  
 old <- setwd(tempdir())
 download.file('http://www.gadm.org/data/shp/ESP_adm.zip', 'ESP_adm.zip')
 unzip('ESP_adm.zip')
 
 mapaSHP <- readShapePoly('ESP_adm2.shp', proj4string=projSIAR)
 
-## Spanish altitude mask
-download.file('http://www.diva-gis.org/data/msk_alt/ESP_msk_alt.zip', 'ESP_msk_alt.zip')
-unzip('ESP_msk_alt.zip')
-elevMask <- raster('ESP_msk_alt')
-
-## France, Andorra, Portugal and Morocco boundaries (from Natural Earth Data)
+## France, Andorra, Portugal and Morocco boundaries (from Natural
+## Earth Data)
 download.file('http://www.naturalearthdata.com/http//www.naturalearthdata.com/download/50m/cultural/ne_50m_admin_0_countries.zip', 'ne_50m_admin_0_countries.zip')
 unzip('ne_50m_admin_0_countries.zip')
 neAdm <- readShapePoly('ne_50m_admin_0_countries',
@@ -537,15 +549,10 @@ setwd(old)
 ## France, Andorra, Portugal and Morocco
 neighbours <- neAdm[neAdm$name %in% c('France', 'Andorra', 'Portugal', 'Morocco'), ]
 spain <- neAdm[neAdm$name == 'Spain',]
+
 writePolyShape(neighbours, 'data/neighbours.shp')
 writePolyShape(spain, 'data/spain.shp')
 
-
-## mapaSHP <- readShapePoly('~/Datos/ESP_adm/ESP_adm2.shp', proj4string=projSIAR)
-## elevMask <- raster('~/Datos/ESP_msk_alt/ESP_msk_alt')
-## neighbours <- readShapePoly('data/neighbours',
-##                             proj4string=projSIAR)
-## spain <- readShapePoly('data/spain', proj4string=projSIAR)
 
 ##############################
 ## Retrieve calculation results
@@ -567,14 +574,14 @@ FixedCMSAF <- raster(gefCMSAF, layer='Fixed')
 HorizCMSAF <- raster(gefCMSAF, layer='Horiz')
 TwoCMSAF <- raster(gefCMSAF, layer='Two')
 
-G0yKrig <- mask(G0yKrig, elevMask)
-FixedKrig <- mask(FixedKrig, elevMask)
-HorizKrig <- mask(HorizKrig, elevMask)
-TwoKrig <- mask(TwoKrig, elevMask)
+G0yKrig <- mask(G0yKrig[[1]], elevMask)
+FixedKrig <- mask(FixedKrig[[1]], elevMask)
+HorizKrig <- mask(HorizKrig[[1]], elevMask)
+TwoKrig <- mask(TwoKrig[[1]], elevMask)
 
-difFixed <- raster(FixedKrig,1)-FixedCMSAF
-difTwo <- raster(TwoKrig,1)-TwoCMSAF
-difHoriz <- raster(HorizKrig,1)-HorizCMSAF
+difFixed <- FixedKrig - FixedCMSAF
+difTwo <- TwoKrig - TwoCMSAF
+difHoriz <- HorizKrig - HorizCMSAF
 
 brickG0y <- stack(G0yCMSAF, G0yKrig)
 difG0y <- G0yKrig- G0yCMSAF
@@ -592,7 +599,7 @@ difHoriz <- HorizKrig- HorizCMSAF
 brickTwo <- stack(TwoCMSAF, TwoKrig)
 names(brickTwo) <- c('CMSAF', 'SIAR+CMSAF')
 
-difTwo <- TwoKrig- TwoCMSAF
+difTwo <- TwoKrig - TwoCMSAF
 
 ## intervals with equal number of stations
 nIntervals <- 8
@@ -733,14 +740,6 @@ dev.off()
 
 system('pdfcrop mapaSIAR.pdf mapaSIAR_crop.pdf') ##without margins
 
-##############################
-## hovmoller
-##############################
-
-pHov <- hovmoller(SISd, add.contour=FALSE)
-trellis.device(pdf, file='hovmoller.pdf')
-pHov
-dev.off()
 
 ##############################
 ## KED Radiation Maps
@@ -751,7 +750,7 @@ radTheme <- modifyList(rasterTheme(),
                                                     alpha=0.3))))
 
 trellis.device(pdf, file='G0yKrig.pdf')
-levelplot(G0yKrig, layer='pred',
+levelplot(G0yKrig, 
           pretty=TRUE, contour=TRUE,
           par.settings=radTheme,
           xlab=' ', ylab=' ', margin=FALSE) +
@@ -762,7 +761,7 @@ levelplot(G0yKrig, layer='pred',
 dev.off()
 
 trellis.device(pdf, file='FixedKrig.pdf')
-levelplot(FixedKrig, layer='pred',
+levelplot(FixedKrig, 
           pretty=TRUE, contour=TRUE,
           par.settings=radTheme,
           xlab=' ', ylab=' ', margin=FALSE) +
@@ -773,7 +772,7 @@ levelplot(FixedKrig, layer='pred',
 dev.off()
 
 trellis.device(pdf, file='HorizKrig.pdf')
-levelplot(HorizKrig, layer='pred',
+levelplot(HorizKrig, 
           pretty=TRUE, contour=TRUE,
           par.settings=radTheme,
           xlab=' ', ylab=' ', margin=FALSE) +
@@ -784,7 +783,7 @@ levelplot(HorizKrig, layer='pred',
 dev.off()
 
 trellis.device(pdf, file='TwoKrig.pdf')
-levelplot(TwoKrig, layer='pred',
+levelplot(TwoKrig, 
           pretty=TRUE, contour=TRUE,
           par.settings=radTheme,
           xlab=' ', ylab=' ', margin=FALSE) +
@@ -801,36 +800,48 @@ system('pdfcrop TwoKrig.pdf TwoKrig.pdf') ##without margins
 
 ## Comparative between fixed and tracking systems
 ## NS Horiz - Fixed
-difKEDHorizFixed <- raster(HorizKrig,1)/raster(FixedKrig,1) - 1
+difKEDHorizFixed <- HorizKrig/FixedKrig - 1
 rangeHorizFixed <- c(minValue(difKEDHorizFixed), maxValue(difKEDHorizFixed))
 rangeHorizFixed
 maxHorizFixed <- max(abs(rangeHorizFixed))
 rangeHorizFixed <- c(-maxHorizFixed, maxHorizFixed)
 
-levelplot(difKEDHorizFixed, par.settings=RdBuTheme ) +
-  layer(sp.points(spGef, pch=19, cex=0.3, col='black')) +
-  layer(sp.lines(mapaSHP))
+levelplot(difKEDHorizFixed, 
+          pretty=TRUE, contour=TRUE,
+          par.settings=RdBuTheme(),
+          xlab=' ', ylab=' ', margin=FALSE) +
+  layer({
+    sp.polygons(neighbours, fill='lightgray')
+    sp.polygons(spain)
+    })
 
 ## Two - Fixed
-difKEDTwoFixed<-raster(TwoKrig,1)/raster(FixedKrig,1) - 1
+difKEDTwoFixed<-TwoKrig/FixedKrig - 1
 rangeTwoFixed <- c(minValue(difKEDTwoFixed), maxValue(difKEDTwoFixed))
 rangeTwoFixed
 maxTwoFixed <- max(abs(rangeTwoFixed))
 rangeTwoFixed <- c(-maxTwoFixed, maxTwoFixed)
 
-levelplot(difKEDTwoFixed, par.settings=RdBuTheme ) +
-  layer(sp.points(spGef, pch=19, cex=0.3, col='black')) +
-  layer(sp.lines(mapaSHP))
+levelplot(difKEDTwoFixed, 
+          pretty=TRUE, contour=TRUE,
+          par.settings=RdBuTheme(),
+          xlab=' ', ylab=' ', margin=FALSE) +
+  layer({
+    sp.polygons(neighbours, fill='lightgray')
+    sp.polygons(spain)
+    })
 
 ## Two - Horiz
-difKEDTwoHoriz<-raster(TwoKrig,1)/raster(HorizKrig,1) - 1
+difKEDTwoHoriz<-TwoKrig/HorizKrig - 1
 rangeTwoHoriz <- c(minValue(difKEDTwoHoriz), maxValue(difKEDTwoHoriz))
 rangeTwoHoriz
 maxTwoHoriz <- max(abs(rangeTwoHoriz))
 rangeTwoHoriz <- c(-maxTwoHoriz, maxTwoHoriz)
-levelplot(difKEDTwoHoriz/HorizKrig, par.settings=RdBuTheme ) +
+
+levelplot(difKEDTwoHoriz, par.settings=RdBuTheme ) +
   layer(sp.points(spGef, pch=19, cex=0.3, col='black')) +
   layer(sp.lines(mapaSHP))
+
 
 compSystems <- stack(difKEDHorizFixed, difKEDTwoFixed, difKEDTwoHoriz)
 names(compSystems) <- c('Horiz.Fixed', 'Two.Fixed', 'Two.Horiz')
