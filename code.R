@@ -803,45 +803,52 @@ system('pdfcrop TwoKrig.pdf TwoKrig.pdf') ##without margins
 difKEDHorizFixed <- HorizKrig/FixedKrig - 1
 rangeHorizFixed <- c(minValue(difKEDHorizFixed), maxValue(difKEDHorizFixed))
 rangeHorizFixed
-maxHorizFixed <- max(abs(rangeHorizFixed))
-rangeHorizFixed <- c(-maxHorizFixed, maxHorizFixed)
-
-levelplot(difKEDHorizFixed, 
-          pretty=TRUE, contour=TRUE,
-          par.settings=RdBuTheme(),
-          xlab=' ', ylab=' ', margin=FALSE) +
-  layer({
-    sp.polygons(neighbours, fill='lightgray')
-    sp.polygons(spain)
-    })
 
 ## Two - Fixed
 difKEDTwoFixed<-TwoKrig/FixedKrig - 1
 rangeTwoFixed <- c(minValue(difKEDTwoFixed), maxValue(difKEDTwoFixed))
 rangeTwoFixed
-maxTwoFixed <- max(abs(rangeTwoFixed))
-rangeTwoFixed <- c(-maxTwoFixed, maxTwoFixed)
 
-levelplot(difKEDTwoFixed, 
-          pretty=TRUE, contour=TRUE,
-          par.settings=RdBuTheme(),
-          xlab=' ', ylab=' ', margin=FALSE) +
-  layer({
-    sp.polygons(neighbours, fill='lightgray')
-    sp.polygons(spain)
-    })
 
 ## Two - Horiz
 difKEDTwoHoriz<-TwoKrig/HorizKrig - 1
 rangeTwoHoriz <- c(minValue(difKEDTwoHoriz), maxValue(difKEDTwoHoriz))
 rangeTwoHoriz
-maxTwoHoriz <- max(abs(rangeTwoHoriz))
-rangeTwoHoriz <- c(-maxTwoHoriz, maxTwoHoriz)
 
-levelplot(difKEDTwoHoriz, par.settings=RdBuTheme ) +
-  layer(sp.points(spGef, pch=19, cex=0.3, col='black')) +
-  layer(sp.lines(mapaSHP))
+my.at <- pretty(range(rangeTwoHoriz, rangeTwoFixed, rangeHorizFixed), 20)
 
+trellis.device(pdf, file='HorizFixed.pdf')
+levelplot(difKEDHorizFixed,
+          at=my.at, contour=TRUE,
+          par.settings=radTheme,
+          xlab=' ', ylab=' ', margin=FALSE) +
+  layer({
+    sp.polygons(neighbours, fill='lightgray')
+    sp.polygons(spain)
+    })
+dev.off()
+
+trellis.device(pdf, file='TwoFixed.pdf')
+levelplot(difKEDTwoFixed,
+          at=my.at, contour=TRUE,
+          par.settings=radTheme,
+          xlab=' ', ylab=' ', margin=FALSE) +
+  layer({
+    sp.polygons(neighbours, fill='lightgray')
+    sp.polygons(spain)
+    })
+dev.off()
+
+trellis.device(pdf, file='TwoHoriz.pdf')
+levelplot(difKEDTwoHoriz,
+          at=my.at, contour=TRUE, 
+          par.settings=radTheme,
+          xlab=' ', ylab=' ', margin=FALSE) +
+  layer({
+    sp.polygons(neighbours, fill='lightgray')
+    sp.polygons(spain)
+    })
+dev.off()
 
 compSystems <- stack(difKEDHorizFixed, difKEDTwoFixed, difKEDTwoHoriz)
 names(compSystems) <- c('Horiz.Fixed', 'Two.Fixed', 'Two.Horiz')
